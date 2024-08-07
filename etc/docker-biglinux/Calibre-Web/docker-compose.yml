@@ -1,0 +1,39 @@
+services: 
+  calibre-web:
+    # Specifies the Docker image to use
+    image: ghcr.io/linuxserver/calibre-web
+    # Sets a custom name for the container
+    container_name: calibre-web
+    environment:
+      # User ID to run the container process
+      PUID: ${PUID}
+      # Group ID to run the container process
+      PGID: ${PGID}
+      # Sets the timezone for the container
+      TZ: ${TZ}
+      # Optional: Relaxes OAuth2 token scope checking
+      - OAUTHLIB_RELAX_TOKEN_SCOPE=1 #optional
+      # Optional & x86-64 only Adds the ability to perform ebook conversion
+      - DOCKER_MODS=linuxserver/mods:universal-calibre #optional
+    
+    volumes:
+      # Maps the local config directory to the container's /config
+      - ${HOME}/Docker/Calibre-Web/config:/config
+      # Maps the local books directory to the container's /books
+      - ${HOME}/Docker/Calibre-Web/books:/books
+    
+    # Restart policy: container will restart unless manually stopped
+    restart: unless-stopped
+    
+    ports:
+      # Maps host port 8083 to container port 8083
+      - 8083:8083
+
+    networks:
+      # Connects the container to the specified network
+      - calibre-web-net
+
+networks:
+  # Defines a custom network for the service
+  calibre-web-net:
+    name: calibre-web-net

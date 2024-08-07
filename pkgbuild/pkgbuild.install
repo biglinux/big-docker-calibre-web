@@ -1,30 +1,64 @@
-## arg 1:  the new package version
-#pre_install() {
-	# do something here
-#}
+# Get the current non-root user
+CURRENT_USER=$(who | awk 'NR==1{print $1}')
 
-## arg 1:  the new package version
-#post_install() {
-    # do something here
-#}
+# Executed after package installation
+post_install() {
+	# Check if Docker is installed
+	if ! command -v docker >/dev/null 2>&1; then
+		echo "The Docker package is not installed. Please install it before continuing."
+		exit 1
+	fi
 
-## arg 2:  the old package version
-#pre_upgrade() {
-	# do something here
-#}
+    # Define source and target paths for metadata.db
+	SOURCE_FILE="/etc/docker-biglinux/calibre-web/metadata.db"
+	TARGET_FILE="/home/$CURRENT_USER/Docker/Calibre-Web/books/metadata.db"
+	TARGET_DIR="/home/$CURRENT_USER/Docker/Calibre-Web/books"
+	
+	# Create target directory if it doesn't exist
+	mkdir -p "$TARGET_DIR"
+	
+	# Copy metadata.db if it doesn't exist in the target directory
+	if [ -f "$TARGET_FILE" ]; then
+		echo "metadata.db already exists in $TARGET_DIR"
+	else
+		echo "Copying metadata.db to $TARGET_DIR"
+		cp -f "$SOURCE_FILE" "$TARGET_FILE"
+	fi
+	
+	# Start the Calibre-Web container using docker-compose
+    echo "Starting the Calibre-Web container..."
 
-## arg 2:  the old package version
-#post_upgrade() {
-	#post_install
-#}
+    # Expand $CURRENT_USER and execute 'docker compose' with eval
+    eval "HOME=/home/$CURRENT_USER docker compose -f /etc/docker-biglinux/calibre-web/docker-compose.yml up -d"
+    
+    # Symlink docker-compose.yml to Docker/Calibre-Web folder
+    echo "Creating symlink to docker-compose.yml..."
+    ln -s /etc/docker-biglinux/calibre-web/docker-compose.yml /home/$CURRENT_USER/Docker/Calibre-Web/docker-compose.yml
+    
+    # Set the correct owner and group for the Docker folder and its contents
+    echo "Setting correct permissions for Docker folder..."
+    chown -R $CURRENT_USER:$CURRENT_USER /home/$CURRENT_USER/Docker/Calibre-Web
+}
 
-## arg 1:  the old package version
-#pre_remove() {
-	# do something here
-#}
+# Upgrade package
+post_upgrade() {
+	post_install
+}
 
-## arg 1:  the old package version
-#post_remove() {
-	# do something here
-#}
- 
+# Executed before package removal
+pre_remove() {
+	# Stop and remove the Calibre-Web container
+	echo "Stopping and removing the Calibre-Web container..."
+	docker compose -f /etc/docker-biglinux/calibre-web/docker-compose.yml down
+	
+	# Remove symlink to docker-compose.yml in Docker/Calibre-Web folder
+    echo "Removing symbolic link to docker-compose.yml..."
+    rm -f /home/$CURRENT_USER/Docker/Calibre-Web/docker-compose.yml
+}
+
+# Executed after package removal
+post_remove() {
+	# Remove the Docker image
+    echo "Removing the Calibre-Web Docker image..."
+    docker rmi calibre-web/calibre-web:latest
+}
